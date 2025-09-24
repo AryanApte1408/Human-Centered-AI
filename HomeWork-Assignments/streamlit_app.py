@@ -5,7 +5,7 @@ st.set_page_config(page_title="HW manager", layout="wide")
 st.title("HW manager")
 
 st.sidebar.title("Navigate")
-page = st.sidebar.radio("Select Homework:", ["HW1", "HW2", "HW3"], index=0)
+page = st.sidebar.radio("Select Homework:", ["HW1", "HW2", "HW3", "HW4"], index=0)
 
 if page == "HW1":
     from HWs.HW1 import app as hw1_app
@@ -18,3 +18,7 @@ elif page == "HW2":
 elif page == "HW3":
     from HWs.HW3 import app as hw3_app
     hw3_app()
+
+elif page == "HW4":
+    from HWs.HW4 import app as hw4_app
+    hw4_app()
