@@ -8,3 +8,4 @@ chromadb
 tiktoken
 beautifulsoup4
 huggingface-hub
+PyMuPDF
