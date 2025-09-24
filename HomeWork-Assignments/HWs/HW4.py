@@ -10,6 +10,7 @@
 # from chromadb.utils import embedding_functions
 # from bs4 import BeautifulSoup
 # import tiktoken
+# from huggingface_hub import login as hf_login
 
 # # --- Fix for ChromaDB sqlite on Streamlit Cloud ---
 # try:
@@ -44,7 +45,7 @@
 #     return truncated
 
 # # ================= Local LLaMA setup =================
-# LOCAL_LLAMA_ID = "meta-llama/Llama-3.1-1B-Instruct"
+# LOCAL_LLAMA_ID = "meta-llama/Llama-3.2-1B-Instruct"
 
 # def _bnb_config(cuda_ok: bool):
 #     return BitsAndBytesConfig(
@@ -55,22 +56,27 @@
 #     )
 
 # @st.cache_resource(show_spinner=False)
-# def load_llama_local_pipeline(model_id: str):
+# def load_llama_local_pipeline(model_id: str, hf_token: str | None = None):
+#     if not hf_token:
+#         raise RuntimeError("❌ HF_TOKEN is required to load local LLaMA models.")
+#     hf_login(token=hf_token)
+
 #     cuda_ok = torch.cuda.is_available()
-#     tok = AutoTokenizer.from_pretrained(model_id)
+#     tok = AutoTokenizer.from_pretrained(model_id, use_auth_token=hf_token)
 #     mdl = AutoModelForCausalLM.from_pretrained(
 #         model_id,
 #         torch_dtype=torch.bfloat16 if cuda_ok else torch.float32,
 #         quantization_config=_bnb_config(cuda_ok),
 #         device_map="auto",
+#         use_auth_token=hf_token,
 #     )
 #     if mdl.config.pad_token_id is None and tok.eos_token_id is not None:
 #         mdl.config.pad_token_id = tok.eos_token_id
 #     pipe = pipeline("text-generation", model=mdl, tokenizer=tok)
 #     return tok, pipe
 
-# def run_llama_local(prompt: str, max_new_tokens=256):
-#     tok, pipe = load_llama_local_pipeline(LOCAL_LLAMA_ID)
+# def run_llama_local(prompt: str, hf_token: str | None = None, max_new_tokens=256):
+#     tok, pipe = load_llama_local_pipeline(LOCAL_LLAMA_ID, hf_token)
 #     msg = [{"role": "user", "content": prompt}]
 #     input_text = tok.apply_chat_template(msg, tokenize=False, add_generation_prompt=True)
 #     out = pipe(input_text, max_new_tokens=max_new_tokens, temperature=0.7, top_p=0.9)
@@ -126,6 +132,7 @@
 #         st.header("🔑 API Keys")
 #         openai_key = st.text_input("OPENAI_API_KEY", type="password")
 #         gemini_key = st.text_input("GEMINI_API_KEY", type="password")
+#         hf_token = st.text_input("HF_TOKEN (Hugging Face Hub)", type="password")
 
 #         st.header("📂 Upload HTMLs")
 #         uploaded_files = st.file_uploader(
@@ -152,8 +159,8 @@
 
 #         st.header("📊 Benchmark Weights")
 #         w_quality = st.slider("Quality", 0.0, 1.0, 0.5, 0.05)
-#         w_speed   = st.slider("Speed",   0.0, 1.0, 0.3, 0.05)
-#         w_cost    = st.slider("Cost",    0.0, 1.0, 0.2, 0.05)
+#         w_speed   = st.slider("Speed", 0.0, 1.0, 0.3, 0.05)
+#         w_cost    = st.slider("Cost", 0.0, 1.0, 0.2, 0.05)
 #         s = w_quality + w_speed + w_cost
 #         if s == 0:
 #             w_quality, w_speed, w_cost = 0.5, 0.3, 0.2
@@ -218,7 +225,10 @@
 #                     else:
 #                         reply = "⚠️ Please add your Gemini key."
 #                 else:
-#                     reply = run_llama_local(rag_augmented, max_new_tokens=max_tokens_llama)
+#                     if not hf_token:
+#                         reply = "⚠️ HF_TOKEN required for Local LLaMA."
+#                     else:
+#                         reply = run_llama_local(rag_augmented, hf_token=hf_token, max_new_tokens=max_tokens_llama)
 #             except Exception as e:
 #                 reply = f"⚠️ Error: {e}"
 
@@ -243,7 +253,7 @@
 #             vendors = [
 #                 ("OpenAI", "gpt-5", openai_key),
 #                 ("Gemini", "gemini-2.5-pro", gemini_key),
-#                 ("Local", LOCAL_LLAMA_ID, None),
+#                 ("Local", LOCAL_LLAMA_ID, hf_token),
 #             ]
 #             results_list = []
 #             for vendor, model, key in vendors:
@@ -262,7 +272,10 @@
 #                             genai.configure(api_key=key)
 #                             ans = genai.GenerativeModel(model).generate_content(prompt).text or ""
 #                         else:
-#                             ans = run_llama_local(prompt, max_new_tokens=256)
+#                             if not hf_token:
+#                                 ans = "⚠️ HF_TOKEN required for Local LLaMA."
+#                             else:
+#                                 ans = run_llama_local(prompt, hf_token=hf_token, max_new_tokens=256)
 #                     except Exception as e:
 #                         ans = f"⚠️ Error: {e}"
 #                     latency = time.perf_counter() - t0
@@ -296,12 +309,19 @@
 # if __name__ == "__main__":
 #     app()
 
+
 # HW4.py — Student Org Chatbot with RAG + Benchmarking
 import os, sys, time, tempfile
 import streamlit as st
 import pandas as pd
 from openai import OpenAI as OpenAIClient
-import google.generativeai as genai
+
+# --- Gemini import (guarded for Streamlit Cloud) ---
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
 import chromadb
@@ -360,13 +380,13 @@ def load_llama_local_pipeline(model_id: str, hf_token: str | None = None):
     hf_login(token=hf_token)
 
     cuda_ok = torch.cuda.is_available()
-    tok = AutoTokenizer.from_pretrained(model_id, use_auth_token=hf_token)
+    tok = AutoTokenizer.from_pretrained(model_id, token=hf_token)
     mdl = AutoModelForCausalLM.from_pretrained(
         model_id,
         torch_dtype=torch.bfloat16 if cuda_ok else torch.float32,
         quantization_config=_bnb_config(cuda_ok),
         device_map="auto",
-        use_auth_token=hf_token,
+        token=hf_token,
     )
     if mdl.config.pad_token_id is None and tok.eos_token_id is not None:
         mdl.config.pad_token_id = tok.eos_token_id
@@ -515,7 +535,9 @@ def app():
                     else:
                         reply = "⚠️ Please add your OpenAI key."
                 elif backend == "Gemini (API)":
-                    if gemini_key:
+                    if genai is None:
+                        reply = "⚠️ google-generativeai is not installed."
+                    elif gemini_key:
                         genai.configure(api_key=gemini_key)
                         model = genai.GenerativeModel(gemini_model)
                         resp = model.generate_content(rag_augmented)
@@ -536,69 +558,6 @@ def app():
 
             if memory_type == "Conversation Summary":
                 st.session_state.summary += f"\nUser: {prompt}\nAssistant: {reply}\n"
-
-    # ================= Benchmark Section =================
-    if "collection" in st.session_state:
-        st.header("Benchmark Evaluation")
-        if st.button("Run Benchmark Tests"):
-            questions = [
-                "What student organizations are available at the iSchool?",
-                "How can I join the Information Security Club?",
-                "What events are organized by Women in Technology?",
-                "Who leads the Data Science Club?",
-                "How do I start a new organization at the iSchool?"
-            ]
-            vendors = [
-                ("OpenAI", "gpt-5", openai_key),
-                ("Gemini", "gemini-2.5-pro", gemini_key),
-                ("Local", LOCAL_LLAMA_ID, hf_token),
-            ]
-            results_list = []
-            for vendor, model, key in vendors:
-                for q in questions:
-                    docs = st.session_state.collection.query(query_texts=[q], n_results=3)
-                    ctx = "\n\n".join(d for d in docs["documents"][0]) if docs else ""
-                    prompt = f"You are a tutor for 10-year-olds.\n\nQUESTION: {q}\n\nCONTEXT:\n{ctx}"
-
-                    t0 = time.perf_counter()
-                    try:
-                        if vendor == "OpenAI" and key:
-                            client = OpenAIClient(api_key=key)
-                            resp = client.responses.create(model=model, input=prompt)
-                            ans = resp.output_text
-                        elif vendor == "Gemini" and key:
-                            genai.configure(api_key=key)
-                            ans = genai.GenerativeModel(model).generate_content(prompt).text or ""
-                        else:
-                            if not hf_token:
-                                ans = "⚠️ HF_TOKEN required for Local LLaMA."
-                            else:
-                                ans = run_llama_local(prompt, hf_token=hf_token, max_new_tokens=256)
-                    except Exception as e:
-                        ans = f"⚠️ Error: {e}"
-                    latency = time.perf_counter() - t0
-                    quality = min(1.0, len(ans.split()) / 250.0)
-                    pricing = {"OpenAI": 0.002, "Gemini": 0.0015, "Local": 0.0}
-                    cost = pricing[vendor] * len(ans.split())
-
-                    results_list.append({
-                        "Vendor": vendor, "Model": model, "Question": q,
-                        "Answer": ans[:250] + "...", "Latency": round(latency, 2),
-                        "Quality": round(quality, 2), "Cost": round(cost, 4)
-                    })
-
-            df = pd.DataFrame(results_list)
-            for i, row in df.iterrows():
-                sq = row["Quality"]
-                ss = normalize(row["Latency"], df["Latency"].min(), df["Latency"].max(), invert=True)
-                sc = normalize(row["Cost"], df["Cost"].min(), df["Cost"].max(), invert=True)
-                df.loc[i, "Score"] = round(sq*w_quality + ss*w_speed + sc*w_cost, 2)
-
-            st.subheader("Benchmark Results")
-            st.dataframe(df)
-
-            csv = df.to_csv(index=False).encode("utf-8")
-            st.download_button("📥 Download Results as CSV", csv, "benchmark_results.csv", "text/csv")
 
     else:
         st.info("👆 Please upload HTML files first to build the vector DB.")

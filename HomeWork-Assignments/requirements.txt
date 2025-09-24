@@ -1,9 +1,10 @@
 streamlit
-openai
-tiktoken
-chromadb
-pysqlite3-binary
-PyMuPDF
-beautifulsoup4
-requests
 pandas
+openai
+google-generativeai
+torch
+transformers
+chromadb
+tiktoken
+beautifulsoup4
+huggingface-hub
