@@ -322,6 +322,13 @@ try:
 except ImportError:
     genai = None
 
+# --- Fix for ChromaDB sqlite on Streamlit Cloud ---
+try:
+    __import__("pysqlite3")
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+except Exception:
+    pass
+
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig, pipeline
 import chromadb
@@ -329,13 +336,6 @@ from chromadb.utils import embedding_functions
 from bs4 import BeautifulSoup
 import tiktoken
 from huggingface_hub import login as hf_login
-
-# --- Fix for ChromaDB sqlite on Streamlit Cloud ---
-try:
-    __import__("pysqlite3")
-    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
-except Exception:
-    pass
 
 # ================= Helpers =================
 def normalize(val, vmin, vmax, invert=False):
@@ -562,6 +562,9 @@ def app():
     else:
         st.info("👆 Please upload HTML files first to build the vector DB.")
 
-# Allow running standalone
-if __name__ == "__main__":
+# Standalone runner
+def main():
     app()
+
+if __name__ == "__main__":
+    main()
