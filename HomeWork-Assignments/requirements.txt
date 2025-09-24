@@ -9,3 +9,4 @@ tiktoken
 beautifulsoup4
 huggingface-hub
 PyMuPDF
+pysqlite3-binary
