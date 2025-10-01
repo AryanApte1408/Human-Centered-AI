@@ -1,11 +1,15 @@
 # streamlit_app.py
 import streamlit as st
 
-st.set_page_config(page_title="HW manager", layout="wide")
-st.title("HW manager")
+st.set_page_config(page_title="HW Manager", layout="wide")
+st.title("HW Manager")
 
 st.sidebar.title("Navigate")
-page = st.sidebar.radio("Select Homework:", ["HW1", "HW2", "HW3", "HW4"], index=0)
+page = st.sidebar.radio(
+    "Select Homework:",
+    ["HW1", "HW2", "HW3", "HW4", "HW5"],  # ✅ Added HW5
+    index=0
+)
 
 if page == "HW1":
     from HWs.HW1 import app as hw1_app
@@ -22,3 +26,7 @@ elif page == "HW3":
 elif page == "HW4":
     from HWs.HW4 import app as hw4_app
     hw4_app()
+
+elif page == "HW5":  
+    from HWs.HW5 import app as hw5_app
+    hw5_app()
