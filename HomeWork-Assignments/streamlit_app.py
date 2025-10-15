@@ -7,7 +7,7 @@ st.title("HW Manager")
 st.sidebar.title("Navigate")
 page = st.sidebar.radio(
     "Select Homework:",
-    ["HW1", "HW2", "HW3", "HW4", "HW5"],  # ✅ Added HW5
+    ["HW1", "HW2", "HW3", "HW4", "HW5", "HW7"],  # ✅ Added HW5
     index=0
 )
 
@@ -30,3 +30,7 @@ elif page == "HW4":
 elif page == "HW5":  
     from HWs.HW5 import app as hw5_app
     hw5_app()
+
+elif page == "HW7":
+    from HWs.HW7 import app as hw7_app
+    hw7_app()
